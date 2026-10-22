@@ -29,7 +29,7 @@ resource "google_service_account_iam_member" "api_workload_identity" {
 
 # nodes: the GKE node pool identity. Logs, metrics, and pulling images; nothing else.
 resource "google_service_account" "nodes" {
-  account_id   = "nodes"
+  account_id   = "gke-nodes"
   display_name = "GKE node pool identity"
 }
 
@@ -49,7 +49,7 @@ resource "google_project_iam_member" "nodes" {
 # ci-sa: what the GitHub Actions pipeline may do. Push images; nothing in the cluster.
 # Bound to the repo through Workload Identity Federation (Lab 5.1), no key file.
 resource "google_service_account" "ci" {
-  account_id   = "ci-sa"
+  account_id   = "ci-pipeline"
   display_name = "CI pipeline identity"
 }
 

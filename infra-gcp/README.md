@@ -10,7 +10,7 @@ The Google Cloud counterpart of `infra-aws/two-tier.yaml`. Everything Modules 1 
 | `network.tf` | VPC, subnet with pod/service ranges, Cloud NAT, Private Services Access, deny-all ingress plus LB health-check allow |
 | `registry.tf` | Artifact Registry repo `apps` |
 | `database.tf` | Cloud SQL Postgres 16, private IP only, generated password in Secret Manager, backups and PITR, regional in prod |
-| `iam.tf` | `api-sa` (cloudsql.client + one secret), `nodes` (logs/metrics/pull), `ci-sa` (push images), Workload Identity binding |
+| `iam.tf` | `api-sa` (cloudsql.client + one secret), `gke-nodes` (logs/metrics/pull), `ci-pipeline` (push images), Workload Identity binding |
 | `cloudrun.tf` | Cloud Run service for the API over a Serverless VPC connector (Lab 1.1), on by default |
 | `gke.tf` | Private regional GKE Standard cluster with Dataplane V2, Workload Identity, Binary Authorization, shielded nodes (Modules 3 and 4), off by default |
 | `outputs.tf` | Connection name, private IP, secret id, registry path, Cloud Run URL |

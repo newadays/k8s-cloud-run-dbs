@@ -45,7 +45,6 @@ variable "create_cloud_run" {
 variable "authorized_cidr" {
   description = "Your IP in CIDR form, allowed to reach the GKE control plane"
   type        = string
-  default     = "0.0.0.0/0"
 }
 
 locals {

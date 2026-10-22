@@ -1,0 +1,14 @@
+# Custom Checkov policy: the GCP counterpart of rules/no-public-db.guard.
+# Fails if any Cloud SQL instance has a public IPv4 address enabled.
+metadata:
+  id: "CKV2_CUSTOM_1"
+  name: "Cloud SQL instances must not have a public IP"
+  category: "NETWORKING"
+  severity: "HIGH"
+definition:
+  cond_type: "attribute"
+  resource_types:
+    - "google_sql_database_instance"
+  attribute: "settings.ip_configuration.ipv4_enabled"
+  operator: "equals"
+  value: "false"

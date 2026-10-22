@@ -77,7 +77,7 @@ run gcloud iam workload-identity-pools providers delete "$WIF_PROVIDER" \
 run gcloud iam workload-identity-pools delete "$WIF_POOL" --location global --quiet
 
 echo "=== 7. Service accounts (api-sa, ci-sa, nodes) ==="
-for sa in api-sa ci-sa nodes; do
+for sa in api-sa ci-pipeline gke-nodes; do
   run gcloud iam service-accounts delete "${sa}@${PROJECT}.iam.gserviceaccount.com" --quiet
 done
 

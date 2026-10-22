@@ -47,7 +47,7 @@ resource "google_compute_router_nat" "nat" {
 
 # Private Services Access: the peering range Cloud SQL's private IP comes from.
 resource "google_compute_global_address" "psa" {
-  name          = "psa-range"
+  name          = "google-managed-services-two-tier-vpc" # matches the range created by hand in Lab 1.1
   purpose       = "VPC_PEERING"
   address_type  = "INTERNAL"
   prefix_length = 16
@@ -62,6 +62,7 @@ resource "google_service_networking_connection" "psa" {
 
 # Firewall: nothing inbound from the internet to nodes. GKE and the load balancer
 # add their own rules; this is the explicit deny-by-default posture for anything else.
+#trivy:ignore:GCP-0074 deny-all rule; covering every port is the point
 resource "google_compute_firewall" "deny_ingress" {
   name      = "two-tier-deny-all-ingress"
   network   = google_compute_network.vpc.name

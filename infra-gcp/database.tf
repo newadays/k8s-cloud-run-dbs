@@ -21,7 +21,14 @@ resource "google_secret_manager_secret_version" "db_password" {
   secret_data = random_password.db.result
 }
 
+#trivy:ignore:GCP-0021 slow-query logging is wanted on this app; it logs statements over 1s, not all statements
 resource "google_sql_database_instance" "db" {
+  #checkov:skip=CKV_GCP_6: ssl_mode=ENCRYPTED_ONLY is set; the check looks for the deprecated require_ssl attribute
+  #checkov:skip=CKV_GCP_79: Postgres 16 is pinned on purpose; major upgrades are a planned change, not a lint fix
+  #checkov:skip=CKV_GCP_110: pgAudit is an enterprise control; out of scope for the lab database
+  #checkov:skip=CKV_GCP_57: slow-query logging (log_min_duration_statement) is wanted on this app
+  #checkov:skip=CKV_GCP_111: log_statement=all would log every query and its data; the slow-query log is enough
+  #checkov:skip=CKV2_GCP_13: log_duration logs timing for every statement; noisy, covered by log_min_duration_statement
   name                = "two-tier-db"
   database_version    = "POSTGRES_16"
   region              = var.region
@@ -30,6 +37,7 @@ resource "google_sql_database_instance" "db" {
 
   settings {
     tier              = var.db_tier
+    edition           = "ENTERPRISE" # db-f1-micro only exists in this edition
     availability_type = local.is_prod ? "REGIONAL" : "ZONAL"
     disk_autoresize   = true
     user_labels       = local.labels
@@ -44,6 +52,7 @@ resource "google_sql_database_instance" "db" {
       enabled                        = true
       point_in_time_recovery_enabled = true
       start_time                     = "03:00"
+      transaction_log_retention_days = local.is_prod ? 7 : 3 # must be <= retained_backups
       backup_retention_settings { retained_backups = local.is_prod ? 14 : 3 }
     }
 
@@ -54,6 +63,31 @@ resource "google_sql_database_instance" "db" {
     database_flags {
       name  = "log_min_duration_statement"
       value = "1000"
+    }
+    # CIS logging flags (Checkov CKV_GCP_51/53/54/108/109, Trivy GCP-0014). Free; restart on first apply.
+    database_flags {
+      name  = "log_checkpoints"
+      value = "on"
+    }
+    database_flags {
+      name  = "log_disconnections"
+      value = "on"
+    }
+    database_flags {
+      name  = "log_lock_waits"
+      value = "on"
+    }
+    database_flags {
+      name  = "log_hostname"
+      value = "on"
+    }
+    database_flags {
+      name  = "log_min_error_statement"
+      value = "error"
+    }
+    database_flags {
+      name  = "log_temp_files"
+      value = "0"
     }
 
     maintenance_window {
