@@ -1,6 +1,6 @@
 # Cloud & Kubernetes Interview Prep Course
 
-Start with Module 0 and the `two-tier-app/` starter (Python/Flask): one container with a web service on your laptop, then build up. Module 3b is the Google "Getting started with Kubernetes" demo ported to Python (`k8s-workshop/`). Module 8 maps everything to the Wiz Technical Account Manager role: CNAPP vocabulary, threat models, and the TAM motion.
+Start with Module 0 and the `two-tier-app/` starter (Python/Flask): one container with a web service on your laptop, then build up. Module 3b is the Google "Getting started with Kubernetes" demo ported to Python (`k8s-workshop/`). Module 8 maps.
 
 Modules:
 
