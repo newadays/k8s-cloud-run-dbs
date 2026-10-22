@@ -1,0 +1,9 @@
+apiVersion: v2
+name: api
+description: The two-tier app's API tier (Flask under gunicorn) with Cloud SQL proxy sidecar, HPA, PDB, and Ingress
+type: application
+version: 0.1.0          # chart version: bump when templates change
+appVersion: "0.2.0"     # image tag deployed by default; overridden per environment by digest
+keywords: [two-tier, flask, gke]
+maintainers:
+  - name: platform

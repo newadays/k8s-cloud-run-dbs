@@ -1,0 +1,30 @@
+# Step 3: the two tiers on your laptop. `docker compose up --build`
+services:
+  api:
+    build: .
+    ports: ["8080:8080"]
+    environment:
+      DB_HOST: db
+      DB_USER: app
+      DB_NAME: app
+      DB_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    depends_on:
+      db: { condition: service_healthy }
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_DB: app
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+secrets:
+  db_password: { file: ./db_password.txt }
+volumes:
+  pgdata:

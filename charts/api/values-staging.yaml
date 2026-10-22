@@ -1,0 +1,15 @@
+replicaCount: 2
+image:
+  digest: ""   # set by CI: kustomize-style promotion is not used here; CI runs helm upgrade --set image.digest=sha256:...
+serviceAccount:
+  annotations:
+    iam.gke.io/gcp-service-account: api-sa@PROJECT.iam.gserviceaccount.com
+cloudSqlProxy:
+  instanceConnectionName: PROJECT:us-central1:two-tier-db
+ingress:
+  enabled: true
+  host: api-staging.example.com
+autoscaling:
+  enabled: false
+networkPolicy:
+  enabled: true

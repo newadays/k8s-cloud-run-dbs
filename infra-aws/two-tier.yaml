@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Two-tier app - App Runner API in front of a private RDS Postgres
+
+Parameters:
+  Env:      { Type: String, AllowedValues: [staging, prod], Default: staging }
+  ImageUri: { Type: String, Description: ECR image, e.g. 123456789012.dkr.ecr.us-east-1.amazonaws.com/api@sha256:... }
+  DbClass:  { Type: String, Default: db.t4g.micro }
+
+Conditions:
+  IsProd: !Equals [!Ref Env, prod]
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties: { CidrBlock: 10.10.0.0/16, EnableDnsSupport: true, EnableDnsHostnames: true }
+  SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties: { VpcId: !Ref Vpc, CidrBlock: 10.10.1.0/24, AvailabilityZone: !Select [0, !GetAZs ""] }
+  SubnetB:
+    Type: AWS::EC2::Subnet
+    Properties: { VpcId: !Ref Vpc, CidrBlock: 10.10.2.0/24, AvailabilityZone: !Select [1, !GetAZs ""] }
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties: { DBSubnetGroupDescription: private db subnets, SubnetIds: [!Ref SubnetA, !Ref SubnetB] }
+
+  ApiSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: { GroupDescription: api egress only, VpcId: !Ref Vpc }
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: postgres from api only
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, SourceSecurityGroupId: !Ref ApiSecurityGroup }
+
+  DbPassword:                                   # generated, never in the template or a parameter
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub two-tier/${Env}/db-password
+      GenerateSecretString: { PasswordLength: 32, ExcludePunctuation: true }
+
+  Db:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: !If [IsProd, Snapshot, Delete]
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      Engine: postgres
+      EngineVersion: "16"
+      DBInstanceClass: !Ref DbClass
+      AllocatedStorage: 20
+      DBName: app
+      MasterUsername: app
+      MasterUserPassword: !Sub "{{resolve:secretsmanager:${DbPassword}:SecretString}}"
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      VPCSecurityGroups: [!Ref DbSecurityGroup]
+      PubliclyAccessible: false
+      StorageEncrypted: true
+      MultiAZ: !If [IsProd, true, false]
+      BackupRetentionPeriod: !If [IsProd, 14, 1]
+      DeletionProtection: !If [IsProd, true, false]
+
+  ApiRole:                                      # what the running container may do: read one secret
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement: [{ Effect: Allow, Principal: { Service: tasks.apprunner.amazonaws.com }, Action: sts:AssumeRole }]
+      Policies:
+        - PolicyName: read-db-secret
+          PolicyDocument:
+            Statement: [{ Effect: Allow, Action: secretsmanager:GetSecretValue, Resource: !Ref DbPassword }]
+  EcrAccessRole:                                # what App Runner may do on your behalf: pull the image
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement: [{ Effect: Allow, Principal: { Service: build.apprunner.amazonaws.com }, Action: sts:AssumeRole }]
+      ManagedPolicyArns: [arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess]
+
+  VpcConnector:
+    Type: AWS::AppRunner::VpcConnector
+    Properties: { Subnets: [!Ref SubnetA, !Ref SubnetB], SecurityGroups: [!Ref ApiSecurityGroup] }
+
+  Api:
+    Type: AWS::AppRunner::Service
+    Properties:
+      ServiceName: !Sub two-tier-api-${Env}
+      SourceConfiguration:
+        AuthenticationConfiguration: { AccessRoleArn: !GetAtt EcrAccessRole.Arn }
+        AutoDeploymentsEnabled: false
+        ImageRepository:
+          ImageIdentifier: !Ref ImageUri
+          ImageRepositoryType: ECR
+          ImageConfiguration:
+            Port: "8080"
+            RuntimeEnvironmentVariables:
+              - { Name: DB_HOST, Value: !GetAtt Db.Endpoint.Address }
+              - { Name: DB_USER, Value: app }
+              - { Name: DB_NAME, Value: app }
+            RuntimeEnvironmentSecrets:
+              - { Name: DB_PASSWORD, Value: !Ref DbPassword }
+      InstanceConfiguration: { Cpu: "0.25 vCPU", Memory: "0.5 GB", InstanceRoleArn: !GetAtt ApiRole.Arn }
+      NetworkConfiguration:
+        EgressConfiguration: { EgressType: VPC, VpcConnectorArn: !GetAtt VpcConnector.VpcConnectorArn }
+      HealthCheckConfiguration: { Protocol: HTTP, Path: /healthz/ready }
+
+Outputs:
+  ApiUrl: { Value: !Sub "https://${Api.ServiceUrl}" }
+  DbEndpoint: { Value: !GetAtt Db.Endpoint.Address }

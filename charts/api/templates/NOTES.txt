@@ -1,0 +1,12 @@
+Release {{ .Release.Name }} deployed to namespace {{ .Release.Namespace }}.
+
+Image: {{ include "api.image" . }}
+
+Check it:
+  kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+  helm -n {{ .Release.Namespace }} test {{ .Release.Name }}
+{{- if .Values.ingress.enabled }}
+  kubectl -n {{ .Release.Namespace }} get ingress {{ include "api.fullname" . }}     # wait for ADDRESS, then point DNS for {{ .Values.ingress.host }} at it
+{{- else }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "api.fullname" . }} 8080:{{ .Values.service.port }}
+{{- end }}
