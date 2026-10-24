@@ -14,7 +14,7 @@ The Google Cloud counterpart of `infra-aws/two-tier.yaml`. Everything Modules 1 
 | `cloudrun.tf` | Cloud Run service for the API over a Serverless VPC connector (Lab 1.1), on by default |
 | `gke.tf` | Private regional GKE Standard cluster with Dataplane V2, Workload Identity, Binary Authorization, shielded nodes (Modules 3 and 4), off by default |
 | `outputs.tf` | Connection name, private IP, secret id, registry path, Cloud Run URL |
-| `envs/*.tfvars` | Per-environment values |
+| `envs/*.tfvars` | Per-environment shape (tier, toggles). Identity (`project`, `authorized_cidr`) is never in these files; `env.sh` exports it from `../.env` |
 
 ## Run it
 
@@ -24,8 +24,8 @@ gcloud storage buckets create gs://PROJECT-tfstate --location us-central1 --unif
 gcloud storage buckets update gs://PROJECT-tfstate --versioning
 
 cd infra-gcp
-sed -i 's/PROJECT/your-project-id/; s#YOUR_IP#'"$(curl -s ifconfig.me)"'#' envs/staging.tfvars
-terraform init -backend-config="bucket=your-project-id-tfstate"
+source env.sh                      # exports TF_VAR_project and TF_VAR_authorized_cidr from the repo-root .env (copy .env.example first)
+terraform init -backend-config="bucket=$PROJECT-tfstate"
 terraform fmt -check && terraform validate
 terraform plan -var-file envs/staging.tfvars -out staging.tfplan
 terraform apply staging.tfplan
@@ -61,3 +61,27 @@ terraform destroy -var-file envs/staging.tfvars
 ```
 
 Prod has `deletion_protection = true` on Cloud SQL and GKE; set `env = "staging"` in a plan first or flip the flag deliberately. `../teardown.sh` runs `terraform destroy` here when it finds state, then sweeps anything left.
+
+## CI identity (Lab 5.1)
+
+`ci-wif.tf` creates a Workload Identity Federation pool and a GitHub OIDC provider, and lets workflows in `github_repository` impersonate `ci-pipeline`. No key file exists. After `terraform apply`, hand the two outputs to the repository as variables. This needs an account with admin on the GitHub repo:
+
+```bash
+gh variable set PROJECT            --body "$PROJECT"
+gh variable set REGION             --body "$REGION"
+gh variable set WIF_PROVIDER       --body "$(terraform output -raw wif_provider)"
+gh variable set CI_SERVICE_ACCOUNT --body "$(terraform output -raw ci_service_account)"
+```
+
+Then push a change under `two-tier-app/` and watch `.github/workflows/ci.yaml`. The run ends with a commit that writes the new digest into `charts/api/values-staging.yaml`.
+
+Things to try:
+
+```bash
+# what the provider trusts
+gcloud iam workload-identity-pools providers describe github --workload-identity-pool=github --location=global --format='value(attributeCondition)'
+# who may impersonate ci-pipeline
+gcloud iam service-accounts get-iam-policy ci-pipeline@$PROJECT.iam.gserviceaccount.com
+# verify the signature CI attached (needs cosign)
+cosign verify --certificate-identity-regexp 'github.com/newadays/k8s-cloud-run-dbs' --certificate-oidc-issuer https://token.actions.githubusercontent.com $REGION-docker.pkg.dev/$PROJECT/apps/api@sha256:...
+```

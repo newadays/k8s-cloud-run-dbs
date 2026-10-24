@@ -1,0 +1,23 @@
+# Lab 4.1: namespace, identity, and config. Secret db-credentials is created with kubectl, never committed:
+# Apply with ./apply.sh (substitutes ${PROJECT} and ${DIGEST} from the repo-root .env / environment).
+#   kubectl -n two-tier create secret generic db-credentials --from-literal=password="$(gcloud secrets versions access latest --secret db-password)"
+apiVersion: v1
+kind: Namespace
+metadata: { name: two-tier }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api
+  namespace: two-tier
+  annotations:
+    iam.gke.io/gcp-service-account: api-sa@${PROJECT}.iam.gserviceaccount.com   # Workload Identity: bound in infra-gcp/iam.tf
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: api-config, namespace: two-tier }
+data:
+  DB_HOST: "127.0.0.1"      # Cloud SQL proxy sidecar in the same pod
+  DB_NAME: "app"
+  DB_USER: "app"
+  LOG_LEVEL: "info"

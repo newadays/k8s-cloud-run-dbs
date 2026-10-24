@@ -1,0 +1,24 @@
+# Rename to 30-ingress.yaml and set a real domain you control before applying.
+# Creates a Google Cloud HTTP(S) load balancer (billable) and a Google-managed certificate
+# that only goes Active once DNS for the host points at the load balancer IP (10-20 min).
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata: { name: api-cert, namespace: two-tier }
+spec: { domains: [api.example.com] }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api
+  namespace: two-tier
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    networking.gke.io/managed-certificates: api-cert
+spec:
+  rules:
+    - host: api.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: api, port: { number: 80 } } }

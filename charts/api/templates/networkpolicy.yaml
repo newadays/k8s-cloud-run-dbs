@@ -24,10 +24,39 @@ spec:
     - from:
         - ipBlock: { cidr: 130.211.0.0/22 }   # GCLB proxies and health checks
         - ipBlock: { cidr: 35.191.0.0/16 }
+        - podSelector: {}                      # other pods in this namespace (helm test, port-forward helpers)
       ports: [{ port: 8080 }]
   egress:
     - to: [{ ipBlock: { cidr: {{ .Values.networkPolicy.dbCidr }} } }]
-      ports: [{ port: 5432 }]
+      ports: [{ port: 3307 }, { port: 5432 }]   # 3307: Cloud SQL Auth Proxy to the instance's private IP; 5432 only if connecting without the proxy
+    - to: [{ ipBlock: { cidr: 169.254.169.254/32 } }]   # GKE metadata server: Workload Identity tokens
+      ports: [{ port: 80 }]
+    - to: [{ ipBlock: { cidr: 0.0.0.0/0 } }]            # Google APIs over TLS (sqladmin for the proxy); tighten to the Private Google Access VIPs in prod
+      ports: [{ port: 443 }]
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+---
+# The `helm test` pod lives under the same default-deny, so it needs its own egress: DNS, and the API on 8080.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "api.fullname" . }}-allow-test
+  labels:
+    {{- include "api.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: test
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "api.selectorLabels" . | nindent 14 }}
+      ports: [{ port: 8080 }]
     - to:
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: kube-system }

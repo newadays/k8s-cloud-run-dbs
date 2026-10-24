@@ -5,9 +5,13 @@
 #   ./cloudrun-lab.sh test     # curl the service
 set -euo pipefail
 
-PROJECT=winged-yeti-511917-t6
-REGION=us-central1
-SA=622192507024-compute@developer.gserviceaccount.com
+# Identity comes from the repo-root .env (PROJECT, REGION), never from this file.
+cd "$(dirname "$0")"
+[ -f ../.env ] && set -a && . ../.env && set +a
+: "${PROJECT:?set PROJECT in ../.env or the environment}"
+REGION=${REGION:-us-central1}
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')
+SA=$PROJECT_NUMBER-compute@developer.gserviceaccount.com   # the default compute service account
 INSTANCE=$PROJECT:$REGION:two-tier-db
 
 case "${1:-}" in
@@ -17,7 +21,6 @@ case "${1:-}" in
     gcloud secrets add-iam-policy-binding db-password --member="serviceAccount:$SA" --role=roles/secretmanager.secretAccessor
     ;;
   deploy)
-    cd "$(dirname "$0")"
     gcloud run deploy api --source . --region="$REGION" --allow-unauthenticated \
       --add-cloudsql-instances "$INSTANCE" \
       --set-secrets DB_PASSWORD=db-password:latest \

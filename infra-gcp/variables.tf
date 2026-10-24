@@ -51,3 +51,8 @@ locals {
   is_prod = var.env == "prod"
   labels  = { app = "two-tier", env = var.env, managed_by = "terraform" }
 }
+
+variable "github_repository" {
+  description = "owner/name of the GitHub repository whose workflows may impersonate ci-pipeline (Lab 5.1)"
+  type        = string
+}

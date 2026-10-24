@@ -12,6 +12,8 @@ resource "google_project_service" "apis" {
     "vpcaccess.googleapis.com",
     "iam.googleapis.com",
     "binaryauthorization.googleapis.com",
+    "iamcredentials.googleapis.com",   # Lab 5.1: WIF token exchange impersonates ci-pipeline through this API
+    "sts.googleapis.com",              # Lab 5.1: GitHub OIDC token -> Google credential
   ])
   service            = each.value
   disable_on_destroy = false

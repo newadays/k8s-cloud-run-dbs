@@ -2,10 +2,9 @@ replicaCount: 3
 image:
   digest: ""   # required in prod; the pipeline fails if empty (see templates/_helpers.tpl)
 serviceAccount:
-  annotations:
-    iam.gke.io/gcp-service-account: api-sa@PROJECT.iam.gserviceaccount.com
+  gcpServiceAccount: api-sa
 cloudSqlProxy:
-  instanceConnectionName: PROJECT:us-central1:two-tier-db
+  instance: two-tier-db
 resources:
   requests: { cpu: 250m, memory: 256Mi }
   limits: { memory: 512Mi }

@@ -1,0 +1,17 @@
+# Headless Service: clusterIP None means no virtual IP and no load balancing.
+# Instead DNS returns one A record per pod, and each pod gets its own stable name:
+#   postgres-0.postgres.pg-lab.svc.cluster.local
+# That stable per-pod name is the thing a StatefulSet gives you that a Deployment does not.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: pg-lab
+  labels: { app: postgres }
+spec:
+  clusterIP: None
+  selector: { app: postgres }
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

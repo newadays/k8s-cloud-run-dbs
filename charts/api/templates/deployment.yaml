@@ -61,13 +61,16 @@ spec:
             initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp   # gunicorn writes worker heartbeat files here; root fs is read-only
         {{- if .Values.cloudSqlProxy.enabled }}
         - name: cloud-sql-proxy
           image: {{ .Values.cloudSqlProxy.image }}
           args:
             - "--private-ip"
             - "--port=5432"
-            - {{ required "cloudSqlProxy.instanceConnectionName is required when the proxy is enabled" .Values.cloudSqlProxy.instanceConnectionName | quote }}
+            - {{ include "api.sqlInstanceConnectionName" . | quote }}
           securityContext:
             runAsNonRoot: true
             allowPrivilegeEscalation: false
@@ -75,3 +78,6 @@ spec:
           resources:
             {{- toYaml .Values.cloudSqlProxy.resources | nindent 12 }}
         {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}

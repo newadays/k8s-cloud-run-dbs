@@ -1,9 +1,14 @@
 # Defaults. Environment files (values-staging.yaml, values-prod.yaml) override these.
+# Nothing in this chart names a GCP project. Pass it at install time: --set gcp.project=$PROJECT (from .env).
+
+gcp:
+  project: ""              # required; the image path, Workload Identity annotation, and Cloud SQL name derive from it
+  region: us-central1
 
 replicaCount: 2
 
 image:
-  repository: us-central1-docker.pkg.dev/PROJECT/apps/api
+  repository: ""   # defaults to <gcp.region>-docker.pkg.dev/<gcp.project>/apps/api
   tag: ""          # defaults to .Chart.AppVersion
   digest: ""       # when set, wins over tag: image: repo@sha256:...
   pullPolicy: IfNotPresent
@@ -11,7 +16,8 @@ image:
 serviceAccount:
   create: true
   name: api
-  annotations: {}  # staging/prod set iam.gke.io/gcp-service-account for Workload Identity
+  gcpServiceAccount: ""  # e.g. api-sa; renders iam.gke.io/gcp-service-account: <name>@<gcp.project>.iam.gserviceaccount.com
+  annotations: {}
 
 config:            # becomes a ConfigMap, loaded with envFrom
   DB_HOST: "127.0.0.1"
@@ -26,7 +32,7 @@ secret:
 cloudSqlProxy:
   enabled: true
   image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.0
-  instanceConnectionName: ""   # PROJECT:REGION:INSTANCE, from terraform output db_connection_name
+  instance: ""                 # Cloud SQL instance name, e.g. two-tier-db; connection name renders as <gcp.project>:<gcp.region>:<instance>
   resources:
     requests: { cpu: 50m, memory: 64Mi }
     limits: { memory: 128Mi }

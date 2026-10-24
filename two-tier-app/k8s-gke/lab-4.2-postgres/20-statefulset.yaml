@@ -1,0 +1,64 @@
+# StatefulSet: pods are named postgres-0, postgres-1, ... and started in order.
+# volumeClaimTemplates creates one PVC per pod (data-postgres-0) that outlives the pod.
+# Deleting the pod keeps the PVC, so the replacement pod gets the same disk.
+# Deleting the StatefulSet does NOT delete the PVC either; only deleting the PVC frees the disk.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: pg-lab
+spec:
+  serviceName: postgres           # must match the headless Service; builds the per-pod DNS names
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      securityContext:
+        runAsUser: 70             # postgres user in the alpine image
+        runAsGroup: 70
+        fsGroup: 70               # makes the mounted disk writable by that user
+        runAsNonRoot: true
+      containers:
+        - name: postgres
+          image: postgres:16.6-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: app
+            - name: POSTGRES_USER
+              value: app
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: postgres-credentials, key: password }
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata   # subdirectory: the mount root has lost+found, initdb refuses a non-empty dir
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "app", "-d", "app"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "app", "-d", "app"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data                # PVC name becomes data-postgres-0
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: standard-rwo   # GKE default: pd-balanced, WaitForFirstConsumer, reclaimPolicy Delete
+        resources:
+          requests:
+            storage: 10Gi         # GCE persistent disks have a 10 GB minimum

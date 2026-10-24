@@ -1,0 +1,28 @@
+# Lab 1b.4 policy check. Extends the default gitleaks rules with identifiers that belong in .env, not in git.
+title = "k8s-cloud-run-dbs"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "gcp-project-id-literal"
+description = "This account's GCP project id; use ${PROJECT} / .env instead"
+regex = '''winged-yeti-511917-t6'''
+keywords = ["winged-yeti"]
+
+[[rules]]
+id = "operator-public-ip"
+description = "Operator public IP; use $MY_IP / .env instead"
+regex = '''\b(99\.190\.130\.26|65\.36\.61\.6)\b'''
+
+[allowlist]
+# `gitleaks dir` scans the working tree regardless of .gitignore. These paths are gitignored (verify: git check-ignore <path>)
+# and are the known local-only homes of identifiers and secrets. Nothing under them can reach a commit.
+paths = [
+  '''^\.env$''',
+  '''^notes\.md$''',
+  '''^\.gitleaks\.toml$''',
+  '''^infra-gcp/\.terraform/''',
+  '''^k8s-workshop/tls/.*\.pem$''',
+  '''^two-tier-app/db_password\.txt$''',
+]

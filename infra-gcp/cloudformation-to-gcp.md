@@ -6,6 +6,7 @@ the GCP counterpart of the AWS block in Module 1b, in the same order.
 
 ```bash
 cd infra-gcp
+source env.sh                    # TF_VAR_project and TF_VAR_authorized_cidr from ../.env; nothing identifying is in tfvars
 TFVARS=envs/staging.tfvars
 
 # validate-template + cfn-lint  ->  fmt, validate, and a policy linter
@@ -14,7 +15,7 @@ terraform validate
 trivy config .                                        # or: checkov -d . --compact   (Lab 1b.4)
 
 # first deploy: a saved plan is the change set; apply executes exactly that plan
-terraform init -backend-config="bucket=winged-yeti-511917-t6-tfstate"
+terraform init -backend-config="bucket=$PROJECT-tfstate"
 terraform plan  -var-file $TFVARS -out staging.tfplan
 terraform apply staging.tfplan
 terraform output                                      # describe-stacks --query Outputs
@@ -39,7 +40,7 @@ terraform apply -var-file $TFVARS -refresh-only       # record the drift into st
 sed -i '' 's/db-g1-small/db-f1-micro/' $TFVARS
 terraform apply -var-file $TFVARS                     # plan shows the revert, apply does it
 # describe-stack-events  ->  the apply log itself, plus the audit trail in Cloud Logging:
-gcloud logging read 'protoPayload.authenticationInfo.principalEmail="gbenga@autographos.org" AND protoPayload.methodName:("insert" OR "patch" OR "delete")' --freshness=1h --limit 20 --format='value(timestamp,protoPayload.methodName,protoPayload.resourceName)'
+gcloud logging read 'protoPayload.authenticationInfo.principalEmail="YOUR_EMAIL" AND protoPayload.methodName:("insert" OR "patch" OR "delete")' --freshness=1h --limit 20 --format='value(timestamp,protoPayload.methodName,protoPayload.resourceName)'
 
 # cleanup: staging has deletion_protection=false; prod refuses until env or the flag is changed
 terraform destroy -var-file $TFVARS
@@ -56,10 +57,10 @@ change set.
 gcloud services enable config.googleapis.com
 # a service account Infra Manager runs Terraform as; Editor is the lab shortcut, narrow it in prod
 gcloud iam service-accounts create infra-manager
-gcloud projects add-iam-policy-binding winged-yeti-511917-t6 --member serviceAccount:infra-manager@winged-yeti-511917-t6.iam.gserviceaccount.com --role roles/editor
+gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:infra-manager@$PROJECT.iam.gserviceaccount.com --role roles/editor
 
-SA=projects/winged-yeti-511917-t6/serviceAccounts/infra-manager@winged-yeti-511917-t6.iam.gserviceaccount.com
-DEP=projects/winged-yeti-511917-t6/locations/us-central1/deployments/two-tier-staging
+SA=projects/$PROJECT/serviceAccounts/infra-manager@$PROJECT.iam.gserviceaccount.com
+DEP=projects/$PROJECT/locations/us-central1/deployments/two-tier-staging
 
 # deploy  (--local-source uploads this folder; drop versions.tf's backend block, Infra Manager keeps state itself)
 gcloud infra-manager deployments apply $DEP --service-account $SA --local-source . --inputs-file envs/staging.tfvars
@@ -67,8 +68,8 @@ gcloud infra-manager deployments describe $DEP                       # describe-
 gcloud infra-manager revisions list --deployment $DEP                 # stack history
 
 # change set: a preview you can read before applying
-gcloud infra-manager previews create projects/winged-yeti-511917-t6/locations/us-central1/previews/bigger-db --deployment $DEP --service-account $SA --local-source . --inputs-file envs/staging.tfvars
-gcloud infra-manager previews export projects/winged-yeti-511917-t6/locations/us-central1/previews/bigger-db   # the plan, as JSON and text
+gcloud infra-manager previews create projects/$PROJECT/locations/us-central1/previews/bigger-db --deployment $DEP --service-account $SA --local-source . --inputs-file envs/staging.tfvars
+gcloud infra-manager previews export projects/$PROJECT/locations/us-central1/previews/bigger-db   # the plan, as JSON and text
 
 # cleanup: destroys the resources, then the deployment record
 gcloud infra-manager deployments delete $DEP

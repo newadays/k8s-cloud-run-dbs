@@ -1,13 +1,12 @@
 replicaCount: 2
 image:
-  digest: ""   # set by CI: kustomize-style promotion is not used here; CI runs helm upgrade --set image.digest=sha256:...
+  digest: ""   # written by CI on every push to main (.github/workflows/ci.yaml); Lab 5.2 Argo CD reads it from here
 serviceAccount:
-  annotations:
-    iam.gke.io/gcp-service-account: api-sa@PROJECT.iam.gserviceaccount.com
+  gcpServiceAccount: api-sa
 cloudSqlProxy:
-  instanceConnectionName: PROJECT:us-central1:two-tier-db
+  instance: two-tier-db
 ingress:
-  enabled: true
+  enabled: false   # no domain for the lab yet; set true with a real host to get a GCLB + managed cert
   host: api-staging.example.com
 autoscaling:
   enabled: false

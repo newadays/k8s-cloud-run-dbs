@@ -1,6 +1,9 @@
 # The Kubernetes option for tier 1 (Modules 3 and 4): private regional GKE Standard cluster.
 
 resource "google_container_cluster" "two_tier" {
+  #checkov:skip=CKV_GCP_12: Dataplane V2 (datapath_provider = ADVANCED_DATAPATH) enforces NetworkPolicy natively; the legacy network_policy block is incompatible with it
+  #checkov:skip=CKV_GCP_69: GKE_METADATA is set on the node pool; the default pool is removed so the cluster-level node_config does not apply
+  #checkov:skip=CKV_GCP_65: Google Groups for RBAC needs a Workspace group gke-security-groups@<domain>; out of scope for the lab
   count    = var.create_gke ? 1 : 0
   name     = "two-tier"
   location = var.region # regional: control plane and nodes in 3 zones
@@ -18,6 +21,14 @@ resource "google_container_cluster" "two_tier" {
     services_secondary_range_name = "services"
   }
   datapath_provider = "ADVANCED_DATAPATH" # Dataplane V2: eBPF, NetworkPolicy enforced without Calico
+
+  enable_intranode_visibility = true # pod-to-pod traffic on the same node shows up in VPC flow logs
+
+  master_auth {
+    client_certificate_config {
+      issue_client_certificate = false # kubectl authenticates with IAM tokens, never a static cert
+    }
+  }
 
   private_cluster_config {
     enable_private_nodes    = true # nodes have no public IP
@@ -85,6 +96,7 @@ resource "google_container_node_pool" "general" {
 
   node_config {
     machine_type    = "e2-medium"
+    image_type      = "COS_CONTAINERD" # the default, stated so scanners can see it
     disk_size_gb    = 50
     disk_type       = "pd-balanced"
     service_account = google_service_account.nodes.email # not the default compute SA

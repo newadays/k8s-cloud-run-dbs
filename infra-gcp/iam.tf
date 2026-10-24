@@ -25,6 +25,9 @@ resource "google_service_account_iam_member" "api_workload_identity" {
   service_account_id = google_service_account.api.name
   role               = "roles/iam.workloadIdentityUser"
   member             = "serviceAccount:${var.project}.svc.id.goog[two-tier/api]"
+
+  # The .svc.id.goog identity pool only exists once the first cluster with Workload Identity is up.
+  depends_on = [google_container_cluster.two_tier]
 }
 
 # nodes: the GKE node pool identity. Logs, metrics, and pulling images; nothing else.
@@ -58,4 +61,14 @@ resource "google_artifact_registry_repository_iam_member" "ci_push" {
   repository = google_artifact_registry_repository.apps.name
   role       = "roles/artifactregistry.writer"
   member     = "serviceAccount:${google_service_account.ci.email}"
+}
+
+# The Helm lab (Module 4.3) releases into per-environment namespaces; each needs its own binding
+# because the Workload Identity member is namespace/serviceaccount, not just the account name.
+resource "google_service_account_iam_member" "api_workload_identity_envs" {
+  for_each           = var.create_gke ? toset(["two-tier-staging", "two-tier-prod"]) : toset([])
+  service_account_id = google_service_account.api.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "serviceAccount:${var.project}.svc.id.goog[${each.key}/api]"
+  depends_on         = [google_container_cluster.two_tier]
 }

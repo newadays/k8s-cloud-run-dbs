@@ -1,0 +1,5 @@
+# Local environment identifiers (project id, region, your IP). Copy .env.example to .env.
+.env
+# Personal study notes
+notes.md
+.DS_Store
